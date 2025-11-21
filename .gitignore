@@ -1,0 +1,19 @@
+# Credentials
+.env
+tiktok_cookies.json
+
+# Logs and screenshots
+tiktok_automation.log
+screenshots/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/

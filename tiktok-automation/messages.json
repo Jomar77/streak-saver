@@ -1,0 +1,41 @@
+{
+  "Monday": [
+    "Happy Monday! Let's start this week strong! 💪",
+    "Good morning! Hope you have an amazing week ahead! ☀️",
+    "Monday motivation: You've got this! 🚀"
+  ],
+  "Tuesday": [
+    "Happy Tuesday! Keep pushing forward! 💫",
+    "Hope you're having a great day! 😊",
+    "Tuesday vibes! You're doing amazing! ⭐"
+  ],
+  "Wednesday": [
+    "Happy Hump Day! We're halfway there! 🎉",
+    "Wednesday wisdom: You're stronger than you think! 💪",
+    "Midweek check-in: You're awesome! 🌟"
+  ],
+  "Thursday": [
+    "Happy Thursday! Almost to the weekend! 🎊",
+    "Thursday thoughts: Keep being amazing! ✨",
+    "One more day to Friday! You're doing great! 🌈"
+  ],
+  "Friday": [
+    "Happy Friday! The weekend is here! 🎉🎊",
+    "TGIF! Hope you have an amazing weekend! 🥳",
+    "Friday feeling! You made it through the week! 🎈"
+  ],
+  "Saturday": [
+    "Happy Saturday! Enjoy your weekend! 🌞",
+    "Weekend vibes! Hope you're having fun! 🎮",
+    "Saturday smiles! Relax and enjoy! 😊"
+  ],
+  "Sunday": [
+    "Happy Sunday! Hope you're having a restful day! 🌸",
+    "Sunday funday! Enjoy your day! 🌺",
+    "Relaxing Sunday vibes! Recharge for the week ahead! 🧘"
+  ],
+  "default": [
+    "Hey! Hope you're having a great day! 😊",
+    "Thinking of you! Have an amazing day! 💖"
+  ]
+}
