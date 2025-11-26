@@ -49,7 +49,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 // Main function to check and send daily message
-async function checkAndSendDailyMessage(force = false) {
+async function checkAndSendDailyMessage(force = false, retryCount = 0) {
+  const MAX_RETRIES = 2;
+  
   try {
     // Check if already run today
     const alreadyRun = await hasRunToday();
@@ -88,16 +90,55 @@ async function checkAndSendDailyMessage(force = false) {
     // Wait for tab to load
     await new Promise(resolve => setTimeout(resolve, 3000));
 
-    // Send message to content script to perform the action
-    chrome.tabs.sendMessage(targetTab.id, {
-      action: 'sendMessage',
-      targetUser: config.targetUser,
-      message: message
+    // Send message with timeout
+    const response = await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Timeout waiting for response'));
+      }, 60000); // 60 second timeout
+      
+      chrome.tabs.sendMessage(targetTab.id, {
+        action: 'sendMessage',
+        targetUser: config.targetUser,
+        message: message
+      }, (response) => {
+        clearTimeout(timeout);
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else {
+          resolve(response);
+        }
+      });
     });
+    
+    // Auto-close the tab after sending (if we created a new one)
+    if (response && response.success) {
+      console.log('Message sent successfully, checking if tab should be closed...');
+      // Only close if we created a new tab (not if we reused existing one)
+      if (tabs.length === 0) {
+        console.log('Closing auto-created tab...');
+        // Wait a moment to ensure message is fully sent
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        await chrome.tabs.remove(targetTab.id);
+        console.log('Tab closed');
+      } else {
+        console.log('Tab was already open, keeping it open');
+      }
+    }
+    
+    if (!response.success && retryCount < MAX_RETRIES) {
+      console.log(`Retry ${retryCount + 1}/${MAX_RETRIES}`);
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      return checkAndSendDailyMessage(force, retryCount + 1);
+    }
 
   } catch (error) {
-    console.error('Error in checkAndSendDailyMessage:', error);
-    showNotification('Error', 'Failed to send message: ' + error.message);
+    if (retryCount < MAX_RETRIES) {
+      console.log(`Retry after error ${retryCount + 1}/${MAX_RETRIES}`);
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      return checkAndSendDailyMessage(force, retryCount + 1);
+    }
+    console.error('All retries failed:', error);
+    showNotification('Failed', 'Could not send message after retries');
   }
 }
 

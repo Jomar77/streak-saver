@@ -41,7 +41,7 @@ async function sendTikTokMessage(targetUser, message) {
     console.log('On messages page, waiting for load...');
     await wait(3000);
     
-    // Find the conversation in the list (without using search)
+    // Find the conversation in the list (by searching DOM)
     console.log('Looking for existing conversation...');
     const userChat = await findUserChatInList(targetUser);
     if (!userChat) {
@@ -65,47 +65,84 @@ async function sendTikTokMessage(targetUser, message) {
     console.log('Waiting for chat to open...');
     await wait(2000);
     
-    // Find message input box (should be in the right panel now)
+    // Find message input box
     console.log('Looking for message input...');
     const messageInput = await findMessageInput();
     if (!messageInput) {
       throw new Error('Could not find message input box');
     }
     
-    // Focus and type message
-    console.log('Typing message...');
+    // Click to focus and trigger state change: placeholder-root → has-focus
+    console.log('Focusing message input...');
+    messageInput.click();
     messageInput.focus();
-    await wait(500);
+    await wait(800);
     
-    // Type the message into the contenteditable div
-    await typeTextToContentEditable(messageInput, message);
+    // Verify has-focus state
+    const parentDiv = messageInput.closest('div[class*="DraftEditor"]');
+    console.log('Parent div classes after focus:', parentDiv?.className);
     
-    // Wait for the send button SVG to appear
-    console.log('Waiting for send button to appear...');
+    // Type the message - this should trigger: has-focus → editorContainer
+    console.log('Typing message...');
+    await typeTextToDraftJS(messageInput, message);
+    
+    // Wait and verify editorContainer state appeared
     await wait(1500);
+    console.log('Parent div classes after typing:', parentDiv?.className);
     
-    // Find and click the send button SVG
-    console.log('Looking for send button...');
-    const sendButton = await findSendButtonSVG();
+    // Find the send button that should now be visible
+    console.log('Looking for send button in new container...');
+    const sendButton = await findSendButton();
     
     if (sendButton) {
-      console.log('Found send button, clicking...');
-      try {
-        sendButton.click();
-      } catch (e) {
-        // Try mouse event if direct click fails
-        const clickEvent = new MouseEvent('click', {
-          view: window,
-          bubbles: true,
-          cancelable: true
-        });
-        sendButton.dispatchEvent(clickEvent);
-      }
+      console.log('Found send button - SVG is present, sending Enter key instead of clicking');
+      
+      // Focus back on the message input
+      messageInput.focus();
+      await wait(200);
+      
+      // Press Enter key to send the message
+      console.log('Pressing Enter key...');
+      
+      // KeyDown event
+      messageInput.dispatchEvent(new KeyboardEvent('keydown', {
+        key: 'Enter',
+        code: 'Enter',
+        keyCode: 13,
+        which: 13,
+        bubbles: true,
+        cancelable: true
+      }));
+      
+      await wait(50);
+      
+      // KeyPress event
+      messageInput.dispatchEvent(new KeyboardEvent('keypress', {
+        key: 'Enter',
+        code: 'Enter',
+        keyCode: 13,
+        which: 13,
+        bubbles: true,
+        cancelable: true
+      }));
+      
+      await wait(50);
+      
+      // KeyUp event
+      messageInput.dispatchEvent(new KeyboardEvent('keyup', {
+        key: 'Enter',
+        code: 'Enter',
+        keyCode: 13,
+        which: 13,
+        bubbles: true,
+        cancelable: true
+      }));
+      
+      console.log('Enter key pressed');
       await wait(1000);
       console.log('Message sent successfully');
     } else {
-      console.log('Send button not found, message may not have been detected');
-      throw new Error('Send button did not appear - message may not be properly set');
+      throw new Error('Send button did not appear after typing');
     }
     
     return true;
@@ -127,51 +164,65 @@ async function findSearchInput() {
   return await findElementBySelectors(selectors, 10000);
 }
 
-// Helper function to find user chat in conversation list (without search)
+// Helper function to find user chat in conversation list (by searching DOM)
 async function findUserChatInList(username) {
-  const maxAttempts = 15;
+  const maxAttempts = 20;
   
   for (let i = 0; i < maxAttempts; i++) {
-    console.log(`Searching for user: ${username} in conversation list (attempt ${i + 1}/${maxAttempts})`);
+    console.log(`Searching DOM for user: ${username} (attempt ${i + 1}/${maxAttempts})`);
     
-    // Look for nickname elements in the conversation list
-    const nicknameElements = document.querySelectorAll('p[class*="PInfoNickname"]');
-    console.log(`Found ${nicknameElements.length} conversation items`);
+    // Try multiple selector strategies for conversation nicknames
+    const selectors = [
+      'p[class*="PInfoNickname"]',
+      'p[class*="Nickname"]',
+      'span[class*="username"]',
+      'div[data-e2e="conversation-item"] p',
+      '[class*="ConversationItem"] [class*="name"]',
+      'p[class*="nickname"]',
+      'span[class*="Name"]'
+    ];
     
-    for (const element of nicknameElements) {
-      const text = element.textContent.trim().toLowerCase();
+    for (const selector of selectors) {
+      const elements = document.querySelectorAll(selector);
       
-      if (text === username.toLowerCase()) {
-        console.log(`✅ Found matching conversation: ${text}`);
+      if (elements.length > 0) {
+        console.log(`Found ${elements.length} conversation items with selector: ${selector}`);
         
-        // Find the clickable conversation container
-        // Try to find the parent that represents the whole conversation item
-        let parent = element;
-        let depth = 0;
-        
-        while (parent && depth < 10) {
-          // Look for a div or element that looks like a conversation item container
-          if (parent.tagName === 'DIV' && 
-              (parent.getAttribute('role') === 'button' || 
-               parent.getAttribute('role') === 'link' ||
-               parent.onclick ||
-               parent.classList.toString().includes('Conversation') ||
-               parent.classList.toString().includes('Item'))) {
-            console.log(`Found conversation container at depth ${depth}`);
-            return parent;
+        for (const element of elements) {
+          const text = element.textContent.trim().toLowerCase();
+          
+          if (text === username.toLowerCase()) {
+            console.log(`✅ Found matching conversation: ${text}`);
+            
+            // Find the clickable conversation container
+            let parent = element;
+            let depth = 0;
+            
+            while (parent && depth < 10) {
+              if (parent.tagName === 'DIV' && 
+                  (parent.getAttribute('role') === 'button' || 
+                   parent.getAttribute('role') === 'link' ||
+                   parent.onclick ||
+                   parent.classList.toString().includes('Conversation') ||
+                   parent.classList.toString().includes('Item'))) {
+                console.log(`Found conversation container at depth ${depth}`);
+                return parent;
+              }
+              parent = parent.parentElement;
+              depth++;
+            }
+            
+            // Fallback: use closest clickable parent
+            const container = element.closest('div[role="button"]') || 
+                             element.closest('div[role="link"]') ||
+                             element.closest('a') ||
+                             element.parentElement.parentElement;
+            
+            if (container) {
+              console.log('Using fallback container');
+              return container;
+            }
           }
-          parent = parent.parentElement;
-          depth++;
-        }
-        
-        // If we can't find a specific container, try closest div with reasonable size
-        const container = element.closest('div[role="button"]') || 
-                         element.closest('div[role="link"]') ||
-                         element.parentElement.parentElement;
-        
-        if (container) {
-          console.log('Using fallback container');
-          return container;
         }
       }
     }
@@ -190,49 +241,70 @@ async function findMessageInput() {
     'div[aria-label*="Send a message"][contenteditable="true"]',
     'div[class*="public-DraftEditor-content"]',
     'div[contenteditable="true"][role="textbox"]',
-    'textarea[placeholder*="message"]',
     '[data-e2e="message-input"]'
   ];
   
   return await findElementBySelectors(selectors, 10000);
 }
 
-// Helper function to find send button SVG that appears when text is entered
-async function findSendButtonSVG() {
-  const maxAttempts = 10;
+// Find send button in the new container (css-1du5ih7-0be0dc34--DivMessageInputAndSendButton)
+async function findSendButton() {
+  const maxAttempts = 15;
   
   for (let i = 0; i < maxAttempts; i++) {
     console.log(`Looking for send button (attempt ${i + 1}/${maxAttempts})`);
     
-    // Look for the SVG with data-e2e="message-send"
+    // Strategy 1: Look for the specific container class that appears with editorContainer
+    const containerSelectors = [
+      'div[class*="DivMessageInputAndSendButton"]',
+      'div[class*="MessageInputAndSendButton"]',
+      'div.css-1du5ih7-0be0dc34--DivMessageInputAndSendButton'
+    ];
+    
+    for (const selector of containerSelectors) {
+      const container = document.querySelector(selector);
+      if (container) {
+        console.log('Found send button container:', selector);
+        
+        // Look for button first (preferred), then SVG
+        const button = container.querySelector('button[aria-label*="Send"]') || 
+                      container.querySelector('button');
+        if (button) {
+          console.log('Found send button element in container');
+          return button;
+        }
+        
+        // If no button, look for SVG and get its button parent
+        const svg = container.querySelector('svg[data-e2e="message-send"]') ||
+                   container.querySelector('svg');
+        if (svg) {
+          const buttonParent = svg.closest('button');
+          if (buttonParent) {
+            console.log('Found send button via container + SVG -> button parent');
+            return buttonParent;
+          }
+        }
+      }
+    }
+    
+    // Strategy 2: Direct SVG search
     const sendSVG = document.querySelector('svg[data-e2e="message-send"]');
     if (sendSVG) {
       console.log('Found send SVG via data-e2e');
-      // Return the button parent or the SVG itself
-      return sendSVG.closest('button') || sendSVG.parentElement || sendSVG;
+      return sendSVG.closest('button') || sendSVG.parentElement;
     }
     
-    // Fallback: look for button with aria-label containing "Send"
+    // Strategy 3: aria-label
     const sendButton = document.querySelector('button[aria-label*="Send"]');
-    if (sendButton) {
+    if (sendButton && !sendButton.disabled) {
       console.log('Found send button via aria-label');
       return sendButton;
     }
     
-    // Fallback: look for any clickable element with role="button" near the message area
-    const buttons = document.querySelectorAll('button[role="button"]');
-    for (const btn of buttons) {
-      const svg = btn.querySelector('svg[data-e2e="message-send"]');
-      if (svg) {
-        console.log('Found send button containing message-send SVG');
-        return btn;
-      }
-    }
-    
-    await wait(300);
+    await wait(500);
   }
   
-  console.error('Could not find send button');
+  console.error('Could not find send button after all attempts');
   return null;
 }
 
@@ -244,69 +316,101 @@ async function findElementBySelectors(selectors, timeout = 10000) {
     for (const selector of selectors) {
       const element = document.querySelector(selector);
       if (element) {
+        console.log('Found element with selector:', selector);
         return element;
       }
     }
     await wait(500);
   }
   
+  console.error('Could not find element with any selector:', selectors);
   return null;
 }
 
-// Helper function to type text naturally
-async function typeText(element, text) {
-  if (element.tagName === 'DIV' && element.contentEditable === 'true') {
-    // For contenteditable divs
-    element.textContent = text;
-    element.dispatchEvent(new Event('input', { bubbles: true }));
-  } else {
-    // For regular inputs
-    element.value = text;
-    element.dispatchEvent(new Event('input', { bubbles: true }));
-    element.dispatchEvent(new Event('change', { bubbles: true }));
-  }
-}
-
-// Special function for DraftJS contenteditable (TikTok uses DraftJS)
-async function typeTextToContentEditable(element, text) {
-  console.log('Setting text in DraftJS editor using character-by-character typing');
+// Type text into DraftJS editor (TikTok's message input)
+// This properly triggers: placeholder-root → has-focus → editorContainer
+async function typeTextToDraftJS(contentEditableDiv, text) {
+  console.log('Typing into DraftJS editor with proper state transitions');
   
-  // Focus the element first
-  element.focus();
-  element.click();
-  await wait(300);
-  
-  // Type each character individually to trigger TikTok's event handlers
-  for (let i = 0; i < text.length; i++) {
-    const char = text[i];
-    
-    // Trigger beforeinput event
-    element.dispatchEvent(new InputEvent('beforeinput', {
-      bubbles: true,
-      cancelable: true,
-      inputType: 'insertText',
-      data: char
-    }));
-    
-    // Simulate the actual text insertion by using document.execCommand (works with contenteditable)
-    document.execCommand('insertText', false, char);
-    
-    // Trigger input event
-    element.dispatchEvent(new InputEvent('input', {
-      bubbles: true,
-      cancelable: false,
-      inputType: 'insertText',
-      data: char
-    }));
-    
-    // Small delay to simulate human typing
-    await wait(20);
+  // Find the inner structure: data-block → data-offset-key div → span[data-text="true"]
+  const dataBlock = contentEditableDiv.querySelector('div[data-block="true"]');
+  if (!dataBlock) {
+    throw new Error('Could not find data-block element');
   }
   
-  // Final change event
-  element.dispatchEvent(new Event('change', { bubbles: true }));
+  const offsetKeyDiv = dataBlock.querySelector('div[data-offset-key]');
+  if (!offsetKeyDiv) {
+    throw new Error('Could not find data-offset-key element');
+  }
   
-  console.log('Text typed into DraftJS editor');
+  // When empty, there's a <br> inside. When typing, we need to replace with <span data-text="true">
+  console.log('Current inner HTML:', offsetKeyDiv.innerHTML);
+  
+  // Clear any existing content (br tag)
+  offsetKeyDiv.innerHTML = '';
+  
+  // Create the span element with data-text="true" and insert text
+  const span = document.createElement('span');
+  span.setAttribute('data-text', 'true');
+  span.textContent = text;
+  offsetKeyDiv.appendChild(span);
+  
+  console.log('Updated inner HTML:', offsetKeyDiv.innerHTML);
+  
+  // Trigger React events to notify TikTok's state management
+  // This is crucial for transitioning to editorContainer state
+  
+  // 1. Focus event
+  contentEditableDiv.dispatchEvent(new FocusEvent('focus', {
+    bubbles: true,
+    cancelable: true
+  }));
+  
+  await wait(100);
+  
+  // 2. BeforeInput event
+  contentEditableDiv.dispatchEvent(new InputEvent('beforeinput', {
+    bubbles: true,
+    cancelable: true,
+    inputType: 'insertText',
+    data: text
+  }));
+  
+  await wait(100);
+  
+  // 3. Input event - this triggers React's onChange
+  contentEditableDiv.dispatchEvent(new InputEvent('input', {
+    bubbles: true,
+    cancelable: false,
+    inputType: 'insertText',
+    data: text
+  }));
+  
+  await wait(100);
+  
+  // 4. KeyUp event for good measure
+  contentEditableDiv.dispatchEvent(new KeyboardEvent('keyup', {
+    bubbles: true,
+    cancelable: true,
+    key: text.slice(-1),
+    code: 'Key' + text.slice(-1).toUpperCase()
+  }));
+  
+  // 5. Change event
+  contentEditableDiv.dispatchEvent(new Event('change', {
+    bubbles: true
+  }));
+  
+  console.log('All events dispatched, text should be set');
+  
+  // Verify the content is actually there
+  await wait(200);
+  const finalText = contentEditableDiv.textContent;
+  console.log('Final textContent:', finalText);
+  
+  if (!finalText || finalText.trim() !== text.trim()) {
+    console.warn('Text content mismatch! Expected:', text, 'Got:', finalText);
+  }
 }
 
 // Helper function to wait
