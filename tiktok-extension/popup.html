@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      width: 320px;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .container {
+      padding: 20px;
+    }
+
+    .header {
+      text-align: center;
+      color: white;
+      margin-bottom: 20px;
+    }
+
+    .header h1 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 600;
+    }
+
+    .header p {
+      margin: 5px 0 0 0;
+      font-size: 12px;
+      opacity: 0.9;
+    }
+
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .status-section {
+      text-align: center;
+    }
+
+    .status-icon {
+      font-size: 48px;
+      margin-bottom: 10px;
+    }
+
+    .status-text {
+      font-size: 14px;
+      color: #333;
+      margin-bottom: 8px;
+      font-weight: 500;
+    }
+
+    .status-detail {
+      font-size: 12px;
+      color: #666;
+    }
+
+    .button {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .button-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      margin-bottom: 8px;
+    }
+
+    .button-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .button-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .button-secondary {
+      background: #f3f4f6;
+      color: #333;
+    }
+
+    .button-secondary:hover {
+      background: #e5e7eb;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid #f0f0f0;
+      font-size: 13px;
+    }
+
+    .info-row:last-child {
+      border-bottom: none;
+    }
+
+    .info-label {
+      color: #666;
+    }
+
+    .info-value {
+      color: #333;
+      font-weight: 500;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 20px;
+      color: white;
+    }
+
+    .spinner {
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-top: 3px solid white;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 10px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .footer {
+      text-align: center;
+      padding: 12px 0 0 0;
+    }
+
+    .footer a {
+      color: white;
+      text-decoration: none;
+      font-size: 12px;
+      opacity: 0.9;
+    }
+
+    .footer a:hover {
+      opacity: 1;
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>⚡ Streak Saver</h1>
+      <p>TikTok Daily Messages</p>
+    </div>
+
+    <div id="loading" class="loading">
+      <div class="spinner"></div>
+      <p>Loading...</p>
+    </div>
+
+    <div id="content" style="display: none;">
+      <div class="card status-section">
+        <div class="status-icon" id="statusIcon">✅</div>
+        <div class="status-text" id="statusText">Message sent today!</div>
+        <div class="status-detail" id="statusDetail">Your streak is safe 🔥</div>
+      </div>
+
+      <div class="card">
+        <div class="info-row">
+          <span class="info-label">Target User:</span>
+          <span class="info-value" id="targetUser">-</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Status:</span>
+          <span class="info-value" id="enabledStatus">-</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Last Run:</span>
+          <span class="info-value" id="lastRun">-</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <button class="button button-primary" id="sendNowBtn">
+          <span>📤</span>
+          <span>Send Message Now</span>
+        </button>
+        <button class="button button-secondary" id="optionsBtn">
+          <span>⚙️</span>
+          <span>Open Settings</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="footer">
+      <a href="#" id="helpLink">Need help?</a>
+    </div>
+  </div>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

@@ -7,6 +7,7 @@ import os
 import json
 import random
 import time
+import subprocess
 from datetime import datetime
 from pathlib import Path
 from selenium import webdriver
@@ -29,9 +30,35 @@ MESSAGES_FILE = 'messages.json'
 LOG_FILE = 'tiktok_automation.log'
 SCREENSHOTS_DIR = 'screenshots'
 COOKIES_FILE = 'tiktok_cookies.json'
+LAST_RUN_FILE = 'last_run.txt'
 
 # Create necessary directories
 Path(SCREENSHOTS_DIR).mkdir(exist_ok=True)
+
+
+def check_already_run_today():
+    """Check if script has already run today"""
+    try:
+        if not os.path.exists(LAST_RUN_FILE):
+            return False
+        
+        with open(LAST_RUN_FILE, 'r') as f:
+            last_run_date = f.read().strip()
+        
+        today = datetime.now().strftime('%Y-%m-%d')
+        return last_run_date == today
+    except Exception as e:
+        return False
+
+
+def mark_run_today():
+    """Mark that script has run today"""
+    try:
+        today = datetime.now().strftime('%Y-%m-%d')
+        with open(LAST_RUN_FILE, 'w') as f:
+            f.write(today)
+    except Exception as e:
+        log_message(f"Failed to mark run today: {str(e)}", 'ERROR')
 
 
 def log_message(message, level='INFO'):
@@ -251,13 +278,31 @@ def send_message(driver, message):
         return False
 
 
+def close_chrome():
+    """Close all Chrome processes"""
+    try:
+        log_message("Closing any open Chrome instances...")
+        subprocess.run(['taskkill', '/F', '/IM', 'chrome.exe'], 
+                      capture_output=True, 
+                      timeout=10)
+        time.sleep(2)  # Wait for Chrome to fully close
+        log_message("Chrome processes closed")
+    except Exception as e:
+        log_message(f"Note: {str(e)}", 'WARNING')
+
+
 def main():
     """Main execution flow"""
     log_message("=" * 60)
     log_message("Starting TikTok automation")
     
+    # Check if already run today
+    if check_already_run_today():
+        log_message("Script already ran today. Skipping execution.", 'INFO')
+        return 0
+    
     # Validate configuration
-    if not all([TIKTOK_USERNAME, TIKTOK_PASSWORD, TARGET_USER]):
+    if not all([TARGET_USER]):
         log_message("Missing required environment variables", 'ERROR')
         return 1
     
@@ -267,40 +312,38 @@ def main():
         # Get daily message
         message = get_daily_message()
         
-        # Setup undetected Chrome driver
+        # Setup Chrome driver with cookies approach (more reliable)
         log_message("Initializing browser")
-        options = uc.ChromeOptions()
-        # options.add_argument('--headless')  # Uncomment for headless mode
-        options.add_argument('--no-sandbox')
-        options.add_argument('--disable-dev-shm-usage')
-        options.add_argument('--disable-blink-features=AutomationControlled')
         
-        driver = uc.Chrome(options=options)
-        driver.set_window_size(1920, 1080)
+        options = uc.ChromeOptions()
+        options.add_argument('--start-maximized')
+        
+        driver = uc.Chrome(options=options, use_subprocess=False)
         
         # Navigate to TikTok
         log_message("Navigating to TikTok")
         driver.get('https://www.tiktok.com')
         time.sleep(3)
         
-        # Try to load cookies
+        # Try to load saved cookies
         cookies_loaded = load_cookies(driver)
         if cookies_loaded:
             driver.refresh()
             time.sleep(3)
-        
-        # Check if login is required
-        if check_login_required(driver):
-            log_message("Login required")
-            if not login_to_tiktok(driver):
-                raise Exception("Login failed")
+            log_message("Cookies loaded - should be logged in")
         else:
-            log_message("Already logged in via cookies")
+            log_message("No saved cookies found - you'll need to log in manually this first time")
+            log_message("Waiting 60 seconds for you to log in manually...")
+            time.sleep(60)
+            save_cookies(driver)
+            log_message("Cookies saved for future use")
         
         # Send the message
         if not send_message(driver, message):
             raise Exception("Failed to send message")
         
+        # Mark that script ran successfully today
+        mark_run_today()
         log_message("Automation completed successfully", 'SUCCESS')
         return 0
         
