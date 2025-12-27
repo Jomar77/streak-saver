@@ -153,6 +153,26 @@ If TikTok updates their website and the extension stops working:
 - **Uses your session**: No credentials stored or transmitted
 - **Open source**: All code is visible and auditable
 
+## ⚠️ Important Disclaimer
+
+**USE AT YOUR OWN RISK**
+
+This extension is provided for **educational and personal use only**.
+
+- 🚫 **Terms of Service**: Using automation tools may violate TikTok's Terms of Service
+- ⛔ **Account Risk**: Your TikTok account could be suspended, restricted, or permanently banned
+- 📵 **No Guarantees**: The extension may stop working if TikTok updates their website
+- 🔒 **No Warranty**: This software is provided "as is" without any warranty
+- 👤 **Personal Responsibility**: You are solely responsible for any consequences of using this extension
+
+**The developer is not responsible for:**
+- Account suspensions or bans
+- Loss of data or messages
+- Any damages arising from the use of this extension
+- Changes to TikTok's platform that break functionality
+
+By using this extension, you acknowledge these risks and agree to use it responsibly.
+
 ## 📝 Customization
 
 ### Add More Messages
@@ -192,10 +212,6 @@ Found a bug or want to improve the extension?
 ## 📄 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
-
-## ⚠️ Disclaimer
-
-This extension is for personal use to maintain message streaks with friends. Use responsibly and in accordance with TikTok's Terms of Service. The developers are not responsible for any account issues that may arise from using this extension.
 
 ## 🆘 Support
 

@@ -1,5 +1,6 @@
 // Content script that runs on TikTok pages
 // This script interacts with the TikTok DOM to send messages
+// Uses React-compatible methods to properly trigger TikTok's state management
 
 console.log('TikTok Streak Saver content script loaded');
 
@@ -254,7 +255,24 @@ async function findSendButton() {
   for (let i = 0; i < maxAttempts; i++) {
     console.log(`Looking for send button (attempt ${i + 1}/${maxAttempts})`);
     
-    // Strategy 1: Look for the specific container class that appears with editorContainer
+    // Strategy 1: data-e2e attribute (most reliable)
+    let button = document.querySelector('svg[data-e2e="message-send"]');
+    if (button) {
+      const buttonParent = button.closest('button') || button.parentElement;
+      if (buttonParent) {
+        console.log('Found send button via data-e2e attribute');
+        return buttonParent;
+      }
+    }
+    
+    // Strategy 2: aria-label
+    button = document.querySelector('button[aria-label*="Send"]');
+    if (button && !button.disabled) {
+      console.log('Found send button via aria-label');
+      return button;
+    }
+    
+    // Strategy 3: Look for the specific container class
     const containerSelectors = [
       'div[class*="DivMessageInputAndSendButton"]',
       'div[class*="MessageInputAndSendButton"]',
@@ -266,12 +284,12 @@ async function findSendButton() {
       if (container) {
         console.log('Found send button container:', selector);
         
-        // Look for button first (preferred), then SVG
-        const button = container.querySelector('button[aria-label*="Send"]') || 
-                      container.querySelector('button');
-        if (button) {
-          console.log('Found send button element in container');
-          return button;
+        // Look for button first (preferred)
+        const btn = container.querySelector('button[aria-label*="Send"]') || 
+                    container.querySelector('button:not([disabled])');
+        if (btn) {
+          console.log('Found send button in container');
+          return btn;
         }
         
         // If no button, look for SVG and get its button parent
@@ -280,25 +298,29 @@ async function findSendButton() {
         if (svg) {
           const buttonParent = svg.closest('button');
           if (buttonParent) {
-            console.log('Found send button via container + SVG -> button parent');
+            console.log('Found send button via container + SVG');
             return buttonParent;
           }
         }
       }
     }
     
-    // Strategy 2: Direct SVG search
-    const sendSVG = document.querySelector('svg[data-e2e="message-send"]');
-    if (sendSVG) {
-      console.log('Found send SVG via data-e2e');
-      return sendSVG.closest('button') || sendSVG.parentElement;
-    }
-    
-    // Strategy 3: aria-label
-    const sendButton = document.querySelector('button[aria-label*="Send"]');
-    if (sendButton && !sendButton.disabled) {
-      console.log('Found send button via aria-label');
-      return sendButton;
+    // Strategy 4: Check if input has content & look for visible buttons near bottom
+    const messageInput = document.querySelector('div[class*="DraftEditor-content"][contenteditable="true"]');
+    if (messageInput && messageInput.textContent.trim().length > 0) {
+      const buttons = document.querySelectorAll('button');
+      for (const btn of buttons) {
+        const svg = btn.querySelector('svg');
+        const rect = btn.getBoundingClientRect();
+        
+        // Check if button is visible and near bottom-right of viewport
+        if (svg && rect.width > 20 && rect.height > 20 && 
+            rect.bottom > window.innerHeight - 200 &&
+            !btn.disabled) {
+          console.log('Found potential send button by proximity');
+          return btn;
+        }
+      }
     }
     
     await wait(500);
@@ -328,88 +350,149 @@ async function findElementBySelectors(selectors, timeout = 10000) {
 }
 
 // Type text into DraftJS editor (TikTok's message input)
-// This properly triggers: placeholder-root → has-focus → editorContainer
+// Uses React-compatible methods to properly trigger state updates
 async function typeTextToDraftJS(contentEditableDiv, text) {
-  console.log('Typing into DraftJS editor with proper state transitions');
+  console.log('Typing into DraftJS editor with React-compatible method');
   
-  // Find the inner structure: data-block → data-offset-key div → span[data-text="true"]
-  const dataBlock = contentEditableDiv.querySelector('div[data-block="true"]');
-  if (!dataBlock) {
-    throw new Error('Could not find data-block element');
+  // Focus the element first
+  contentEditableDiv.focus();
+  await wait(500);
+  
+  // METHOD 1: Direct text content manipulation with proper React events
+  try {
+    // Find the inner structure: data-block → data-offset-key div
+    const dataBlock = contentEditableDiv.querySelector('div[data-block="true"]');
+    const offsetKeyDiv = dataBlock ? dataBlock.querySelector('div[data-offset-key]') : null;
+    
+    if (offsetKeyDiv) {
+      // Clear any existing content (br tag)
+      offsetKeyDiv.innerHTML = '';
+      
+      // Create the span element with data-text="true" and insert text
+      const span = document.createElement('span');
+      span.setAttribute('data-text', 'true');
+      span.textContent = text;
+      offsetKeyDiv.appendChild(span);
+      
+      console.log('Set text via span element:', text);
+    } else {
+      // Fallback: set textContent directly
+      contentEditableDiv.textContent = text;
+      console.log('Set text via textContent:', text);
+    }
+    
+    // Trigger React's synthetic events in correct order
+    const inputEvent = new InputEvent('input', {
+      bubbles: true,
+      cancelable: true,
+      inputType: 'insertText',
+      data: text,
+      composed: true
+    });
+    
+    contentEditableDiv.dispatchEvent(inputEvent);
+    
+    // Also trigger keyup to ensure React detects change
+    const keyupEvent = new KeyboardEvent('keyup', {
+      bubbles: true,
+      cancelable: true,
+      key: 'a',
+      code: 'KeyA'
+    });
+    
+    contentEditableDiv.dispatchEvent(keyupEvent);
+    
+    await wait(500);
+    
+    // Check if text was successfully set
+    if (contentEditableDiv.textContent.includes(text)) {
+      console.log('Method 1 successful - text is set');
+      return;
+    }
+  } catch (e) {
+    console.log('Method 1 failed:', e.message);
   }
   
-  const offsetKeyDiv = dataBlock.querySelector('div[data-offset-key]');
-  if (!offsetKeyDiv) {
-    throw new Error('Could not find data-offset-key element');
+  // METHOD 2: Paste event simulation
+  console.log('Trying paste method...');
+  try {
+    const dataTransfer = new DataTransfer();
+    dataTransfer.setData('text/plain', text);
+    
+    const pasteEvent = new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer
+    });
+    
+    contentEditableDiv.dispatchEvent(pasteEvent);
+    await wait(500);
+    
+    if (contentEditableDiv.textContent.includes(text)) {
+      console.log('Method 2 (paste) successful');
+      return;
+    }
+  } catch (e) {
+    console.log('Method 2 failed:', e.message);
   }
   
-  // When empty, there's a <br> inside. When typing, we need to replace with <span data-text="true">
-  console.log('Current inner HTML:', offsetKeyDiv.innerHTML);
+  // METHOD 3: Character-by-character input with keyboard events
+  console.log('Trying character-by-character method...');
+  try {
+    // Clear first
+    contentEditableDiv.innerHTML = '';
+    
+    for (const char of text) {
+      // KeyDown
+      contentEditableDiv.dispatchEvent(new KeyboardEvent('keydown', {
+        bubbles: true,
+        cancelable: true,
+        key: char,
+        code: 'Key' + char.toUpperCase()
+      }));
+      
+      // BeforeInput
+      contentEditableDiv.dispatchEvent(new InputEvent('beforeinput', {
+        bubbles: true,
+        cancelable: true,
+        inputType: 'insertText',
+        data: char
+      }));
+      
+      // Append char
+      contentEditableDiv.textContent += char;
+      
+      // Input
+      contentEditableDiv.dispatchEvent(new InputEvent('input', {
+        bubbles: true,
+        cancelable: false,
+        inputType: 'insertText',
+        data: char
+      }));
+      
+      // KeyUp
+      contentEditableDiv.dispatchEvent(new KeyboardEvent('keyup', {
+        bubbles: true,
+        cancelable: true,
+        key: char,
+        code: 'Key' + char.toUpperCase()
+      }));
+      
+      await wait(30); // Small delay between characters
+    }
+    
+    console.log('Method 3 complete, checking content...');
+  } catch (e) {
+    console.log('Method 3 failed:', e.message);
+  }
   
-  // Clear any existing content (br tag)
-  offsetKeyDiv.innerHTML = '';
-  
-  // Create the span element with data-text="true" and insert text
-  const span = document.createElement('span');
-  span.setAttribute('data-text', 'true');
-  span.textContent = text;
-  offsetKeyDiv.appendChild(span);
-  
-  console.log('Updated inner HTML:', offsetKeyDiv.innerHTML);
-  
-  // Trigger React events to notify TikTok's state management
-  // This is crucial for transitioning to editorContainer state
-  
-  // 1. Focus event
-  contentEditableDiv.dispatchEvent(new FocusEvent('focus', {
-    bubbles: true,
-    cancelable: true
-  }));
-  
-  await wait(100);
-  
-  // 2. BeforeInput event
-  contentEditableDiv.dispatchEvent(new InputEvent('beforeinput', {
-    bubbles: true,
-    cancelable: true,
-    inputType: 'insertText',
-    data: text
-  }));
-  
-  await wait(100);
-  
-  // 3. Input event - this triggers React's onChange
-  contentEditableDiv.dispatchEvent(new InputEvent('input', {
-    bubbles: true,
-    cancelable: false,
-    inputType: 'insertText',
-    data: text
-  }));
-  
-  await wait(100);
-  
-  // 4. KeyUp event for good measure
-  contentEditableDiv.dispatchEvent(new KeyboardEvent('keyup', {
-    bubbles: true,
-    cancelable: true,
-    key: text.slice(-1),
-    code: 'Key' + text.slice(-1).toUpperCase()
-  }));
-  
-  // 5. Change event
-  contentEditableDiv.dispatchEvent(new Event('change', {
-    bubbles: true
-  }));
-  
-  console.log('All events dispatched, text should be set');
-  
-  // Verify the content is actually there
-  await wait(200);
+  // Final verification
+  await wait(500);
   const finalText = contentEditableDiv.textContent;
   console.log('Final textContent:', finalText);
   
-  if (!finalText || finalText.trim() !== text.trim()) {
-    console.warn('Text content mismatch! Expected:', text, 'Got:', finalText);
+  if (!finalText || !finalText.includes(text.substring(0, 5))) {
+    console.warn('Text content may not have been set correctly!');
   }
 }
 
