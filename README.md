@@ -45,6 +45,17 @@ This repository is configured to publish releases automatically when you push a 
    - `git push origin v1.0.0`
 5. GitHub Actions workflow creates a Release with zip asset `tiktok-extension-v1.0.0.zip`.
 
+### One-command publish (Windows PowerShell)
+
+From the repository root:
+
+- Package only:
+   - `./publish_tiktok_extension.ps1`
+- Package + commit + push + tag (triggers GitHub Release):
+   - `./publish_tiktok_extension.ps1 -Publish`
+
+The script validates that the tag version matches `tiktok-extension/manifest.json`.
+
 ### Important version rule
 
 Tag version must match `manifest.json` version exactly (without the leading `v`).
