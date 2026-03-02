@@ -19,51 +19,6 @@ Chrome extension that helps keep a TikTok message streak alive by sending one da
 4. Save settings.
 5. Use **Send Message Now** once to verify everything works.
 
-## Update to a New Version
-
-1. Download the newest release zip.
-2. Extract it.
-3. In `chrome://extensions/`, remove the old unpacked version (or use **Reload** and point to the new folder).
-4. Keep your settings if prompted.
-
-## Project Structure
-
-- [tiktok-extension](tiktok-extension): Chrome extension source code
-- [CHANGELOG.md](CHANGELOG.md): release notes history
-
-## Release Automation (Maintainer)
-
-This repository is configured to publish releases automatically when you push a semantic tag.
-
-### One-time first release
-
-1. Bump `version` in [tiktok-extension/manifest.json](tiktok-extension/manifest.json).
-2. Update [CHANGELOG.md](CHANGELOG.md).
-3. Commit and push to `main`.
-4. Create and push a matching tag:
-   - `git tag v1.0.0`
-   - `git push origin v1.0.0`
-5. GitHub Actions workflow creates a Release with zip asset `tiktok-extension-v1.0.0.zip`.
-
-### One-command publish (Windows PowerShell)
-
-From the repository root:
-
-- Package only:
-   - `./publish_tiktok_extension.ps1`
-- Package + commit + push + tag (triggers GitHub Release):
-   - `./publish_tiktok_extension.ps1 -Publish`
-
-The script validates that the tag version matches `tiktok-extension/manifest.json`.
-
-### Important version rule
-
-Tag version must match `manifest.json` version exactly (without the leading `v`).
-
-Example:
-- Tag: `v1.0.1`
-- Manifest version: `1.0.1`
-
 ## Existing Extension Docs
 
 For extension-specific troubleshooting and usage details:
